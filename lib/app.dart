@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/login_page.dart';
+import 'pages/home_page.dart';
+import 'session/user_session.dart';
 
 class IMClientApp extends StatelessWidget {
   const IMClientApp({super.key});
@@ -25,7 +27,7 @@ class IMClientApp extends StatelessWidget {
         useMaterial3: true,
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),
-      home: const LoginPage(),
+      home: UserSession().isLogin ? const HomePage() : const LoginPage(),
     );
   }
 }

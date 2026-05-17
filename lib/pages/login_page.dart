@@ -8,6 +8,7 @@ import 'package:im_client/session/user_session.dart';
 import 'package:im_client/utils/crypto_util.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -90,9 +91,10 @@ class _LoginPageState extends State<LoginPage> {
       final error = ErrorCode.fromValue(data['error'] as int? ?? -1);
       if (error == ErrorCode.ok) {
         setState(() => _loading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('登录成功')));
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
       } else {
         setState(() => _loading = false);
         _showError('授权失败');
