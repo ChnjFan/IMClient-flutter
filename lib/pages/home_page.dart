@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'conversations_page.dart';
+import 'contacts_page.dart';
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,8 +15,8 @@ class _HomePageState extends State<HomePage> {
 
   final _pages = const [
     ConversationsPage(),
-    _PlaceholderPage(title: '通讯录', icon: Icons.contacts_outlined),
-    _PlaceholderPage(title: '我的', icon: Icons.person_outline),
+    ContactsPage(),
+    ProfilePage(),
   ];
 
   @override
@@ -43,30 +45,6 @@ class _HomePageState extends State<HomePage> {
             label: '我的',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _PlaceholderPage({required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(title, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-          ],
-        ),
       ),
     );
   }

@@ -105,7 +105,6 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onTcpConnected() {
     final session = UserSession();
-    _showError('长连接已建立，正在授权...');
     session.tcpClient!.sendMessage(TcpMsgId.authReq.value, {
       'uid': session.uid,
       'token': session.token,
@@ -118,7 +117,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onTcpDisconnected() {
     if (!mounted) return;
-    _showError('长连接断开，正在重连...');
+    _showError('服务器连接断开，正在重连...');
   }
 
   void _onTcpError(dynamic error) {
