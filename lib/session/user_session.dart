@@ -5,7 +5,7 @@ class UserSession {
   factory UserSession() => _instance;
   UserSession._();
 
-  String uid = '';
+  int uid = 0;
   String token = '';
   String tcpHost = '';
   int tcpPort = 0;
@@ -14,10 +14,10 @@ class UserSession {
 
   TcpClient? tcpClient;
 
-  bool get isLogin => uid.isNotEmpty && token.isNotEmpty;
+  bool get isLogin => uid != 0 && token.isNotEmpty;
 
   void saveLoginResponse(Map<String, dynamic> data) {
-    uid = data['uid']?.toString() ?? '';
+    uid = data['uid'] as int? ?? 0;
     token = data['token']?.toString() ?? '';
     tcpHost = data['host']?.toString() ?? '';
     tcpPort = int.tryParse(data['port']?.toString() ?? '') ?? 0;
@@ -28,7 +28,7 @@ class UserSession {
   void clear() {
     tcpClient?.disconnect();
     tcpClient = null;
-    uid = '';
+    uid = 0;
     token = '';
     tcpHost = '';
     tcpPort = 0;

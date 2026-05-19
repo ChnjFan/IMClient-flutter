@@ -1,6 +1,11 @@
 enum TcpMsgId {
   authReq(1005), // 登录授权请求
-  authRsp(1006); // 登录授权响应
+  authRsp(1006), // 登录授权响应
+  userSearchReq(1007), // 搜索用户请求
+  userSearchRsp(1008), // 搜索用户响应
+  friendAddReq(1009), // 添加好友请求
+  friendAddRsp(1010), // 添加好友响应
+  notifyFriendAddReq(1011); // 通知好友添加请求
 
   const TcpMsgId(this.value);
 

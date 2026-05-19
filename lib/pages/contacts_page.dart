@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'add_friend_page.dart';
+import 'friend_requests_page.dart';
 
 class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
@@ -73,27 +74,46 @@ class _ContactsPageState extends State<ContactsPage> {
             ),
           ),
           Expanded(
-            child:
-                contacts.isEmpty
-                    ? const Center(
+            child: ListView(
+              children: [
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.orange.shade100,
+                    child: Icon(Icons.person_add, color: Colors.orange.shade700),
+                  ),
+                  title: const Text('新的朋友'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const FriendRequestsPage(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 1, indent: 72),
+                if (contacts.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
                       child: Text(
                         '未找到联系人',
                         style: TextStyle(color: Colors.grey),
                       ),
-                    )
-                    : ListView.separated(
-                      itemCount: contacts.length,
-                      separatorBuilder:
-                          (_, __) => const Divider(height: 1, indent: 72),
-                      itemBuilder: (context, index) {
-                        final name = contacts[index];
-                        return ListTile(
-                          leading: CircleAvatar(child: Text(name[0])),
-                          title: Text(name),
-                          onTap: () {},
-                        );
-                      },
                     ),
+                  )
+                else
+                  for (int i = 0; i < contacts.length; i++) ...[
+                    ListTile(
+                      leading: CircleAvatar(child: Text(contacts[i][0])),
+                      title: Text(contacts[i]),
+                      onTap: () {},
+                    ),
+                    if (i < contacts.length - 1)
+                      const Divider(height: 1, indent: 72),
+                  ],
+              ],
+            ),
           ),
         ],
       ),

@@ -52,8 +52,11 @@ class TcpClient {
     if (_host == null || _port == null) return;
 
     try {
-      _socket = await Socket.connect(_host!, _port!,
-          timeout: const Duration(seconds: 10));
+      _socket = await Socket.connect(
+        _host!,
+        _port!,
+        timeout: const Duration(seconds: 10),
+      );
       _reconnecting = false;
       _reconnectCount = 0;
       _buffer.clear();
@@ -121,7 +124,7 @@ class TcpClient {
     _reconnectCount++;
     if (_reconnectCount > maxReconnectAttempts) {
       for (final handler in _errorHandlers) {
-        handler('连接服务器失败，已重试$maxReconnectAttempts次，请检查网络后重新登录');
+        handler('连接中断');
       }
       return;
     }

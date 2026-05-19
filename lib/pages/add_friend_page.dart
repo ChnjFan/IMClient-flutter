@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:im_client/network/http_client.dart';
+import 'package:im_client/network/tcp_message_handler.dart';
+import 'package:im_client/network/tcp_msg_id.dart';
+import 'package:im_client/session/user_session.dart';
 
 class AddFriendPage extends StatefulWidget {
   const AddFriendPage({super.key});
@@ -10,10 +12,13 @@ class AddFriendPage extends StatefulWidget {
 
 class _AddFriendPageState extends State<AddFriendPage> {
   final _keywordController = TextEditingController();
+  final _msgHandler = TcpMessageHandler();
   bool _loading = false;
   List<Map<String, dynamic>> _results = [];
   bool _searched = false;
   bool _hasInput = false;
+  final Set<int> _appliedUids = {};
+  int? _requestingUid;
 
   @override
   void initState() {
@@ -24,38 +29,31 @@ class _AddFriendPageState extends State<AddFriendPage> {
         setState(() => _hasInput = hasInput);
       }
     });
+    _setupMessageHandlers();
+    UserSession().tcpClient?.onMessage(_onTcpMessage);
   }
 
   @override
   void dispose() {
+    UserSession().tcpClient?.removeMessageHandler(_onTcpMessage);
     _keywordController.dispose();
     super.dispose();
   }
 
-  bool get _isEmail => _keywordController.text.trim().contains('@');
-
-  Future<void> _search() async {
-    final keyword = _keywordController.text.trim();
-    if (keyword.isEmpty) return;
-
-    setState(() {
-      _loading = true;
-      _searched = true;
-    });
-
-    try {
-      final response = await HttpClient().post(
-        '/user_search',
-        data: {_isEmail ? 'email' : 'user': keyword},
-      );
-
+  void _setupMessageHandlers() {
+    _msgHandler.on(TcpMsgId.userSearchRsp, (msgId, data) {
       if (!mounted) return;
-
-      final error = response.data['error'] as int? ?? -1;
+      final error = data['error'] as int? ?? -1;
       if (error == 0) {
-        final users = response.data['data'] as List<dynamic>? ?? [];
+        final results = <Map<String, dynamic>>[];
+        final inner = data['data'];
+        if (inner is List) {
+          results.addAll(inner.cast<Map<String, dynamic>>());
+        } else if (inner is Map<String, dynamic> && inner['uid'] != null) {
+          results.add(inner);
+        }
         setState(() {
-          _results = users.cast<Map<String, dynamic>>();
+          _results = results;
           _loading = false;
         });
       } else {
@@ -65,37 +63,72 @@ class _AddFriendPageState extends State<AddFriendPage> {
         });
         _showError('搜索失败');
       }
-    } catch (e) {
+    });
+
+    _msgHandler.on(TcpMsgId.friendAddRsp, (msgId, data) {
       if (!mounted) return;
-      setState(() {
-        _results = [];
-        _loading = false;
-      });
-      _showError('搜索失败: $e');
-    }
-  }
-
-  Future<void> _addFriend(Map<String, dynamic> user) async {
-    try {
-      final response = await HttpClient().post(
-        '/friend_add',
-        data: {'uid': user['uid']},
-      );
-
-      if (!mounted) return;
-
-      final error = response.data['error'] as int? ?? -1;
+      final error = data['error'] as int? ?? -1;
       if (error == 0) {
+        if (_requestingUid != null) {
+          _appliedUids.add(_requestingUid!);
+        }
+        setState(() => _requestingUid = null);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('好友请求已发送')));
       } else {
+        setState(() => _requestingUid = null);
         _showError('添加失败');
       }
-    } catch (e) {
-      if (!mounted) return;
-      _showError('添加失败: $e');
+    });
+  }
+
+  void _onTcpMessage(int msgId, Map<String, dynamic> data) {
+    _msgHandler.handle(msgId, data);
+  }
+
+  bool get _isEmail => _keywordController.text.trim().contains('@');
+
+  void _search() {
+    final keyword = _keywordController.text.trim();
+    if (keyword.isEmpty) return;
+
+    final tcpClient = UserSession().tcpClient;
+    if (tcpClient == null || !tcpClient.isConnected) {
+      _showError('未连接到服务器');
+      return;
     }
+
+    setState(() {
+      _loading = true;
+      _searched = true;
+    });
+
+    tcpClient.sendMessage(TcpMsgId.userSearchReq.value, {
+      _isEmail ? 'email' : 'name': keyword,
+    });
+  }
+
+  void _addFriend(Map<String, dynamic> user) {
+    final tcpClient = UserSession().tcpClient;
+    if (tcpClient == null || !tcpClient.isConnected) {
+      _showError('未连接到服务器');
+      return;
+    }
+
+    final toUid = user['uid'] as int? ?? -1;
+    if (toUid == UserSession().uid) {
+      _showError('无法添加自己为好友');
+      return;
+    }
+    setState(() => _requestingUid = toUid);
+
+    tcpClient.sendMessage(TcpMsgId.friendAddReq.value, {
+      'fromUid': UserSession().uid,
+      'toUid': toUid,
+      'applyName': user['name'] as String? ?? '',
+      'applyEmail': user['email'] as String? ?? '',
+    });
   }
 
   void _showError(String message) {
@@ -180,8 +213,11 @@ class _AddFriendPageState extends State<AddFriendPage> {
                           (_, __) => const Divider(height: 1, indent: 72),
                       itemBuilder: (context, index) {
                         final user = _results[index];
-                        final nickname = user['nickname']?.toString() ?? '';
+                        final uid = user['uid'] as int? ?? -1;
+                        final nickname = user['name']?.toString() ?? '';
                         final email = user['email']?.toString() ?? '';
+                        final applied = _appliedUids.contains(uid);
+                        final requesting = _requestingUid == uid;
                         return ListTile(
                           leading: CircleAvatar(
                             child: Text(
@@ -191,8 +227,22 @@ class _AddFriendPageState extends State<AddFriendPage> {
                           title: Text(nickname.isNotEmpty ? nickname : '未知用户'),
                           subtitle: Text(email),
                           trailing: FilledButton.tonal(
-                            onPressed: () => _addFriend(user),
-                            child: const Text('添加'),
+                            onPressed:
+                                (applied || requesting)
+                                    ? null
+                                    : () => _addFriend(user),
+                            child:
+                                applied
+                                    ? const Text('已申请')
+                                    : requesting
+                                    ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Text('添加'),
                           ),
                         );
                       },

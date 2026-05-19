@@ -5,5 +5,5 @@ class AppConfig {
   static const int httpReceiveTimeout = 10;
   static const int httpSendTimeout = 10;
 
-  static const int tcpReconnectDelay = 3;
+  static const int tcpReconnectDelay = 10;
 }
