@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:im_client/network/tcp_message_handler.dart';
+import 'package:im_client/network/tcp_msg_id.dart';
+import 'package:im_client/session/user_session.dart';
 import 'add_friend_page.dart';
 import 'friend_requests_page.dart';
 
@@ -11,6 +14,7 @@ class ContactsPage extends StatefulWidget {
 
 class _ContactsPageState extends State<ContactsPage> {
   final _searchController = TextEditingController();
+  final _msgHandler = TcpMessageHandler();
   String _keyword = '';
 
   final _allContacts = const ['张三', '李四', '王五', '赵六', '小明', '小红'];
@@ -21,14 +25,34 @@ class _ContactsPageState extends State<ContactsPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _setupMessageHandlers();
+    UserSession().tcpClient?.onMessage(_onTcpMessage);
+  }
+
+  @override
   void dispose() {
+    UserSession().tcpClient?.removeMessageHandler(_onTcpMessage);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _setupMessageHandlers() {
+    _msgHandler.on(TcpMsgId.notifyFriendReq, (msgId, data) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
+
+  void _onTcpMessage(int msgId, Map<String, dynamic> data) {
+    _msgHandler.handle(msgId, data);
   }
 
   @override
   Widget build(BuildContext context) {
     final contacts = _filteredContacts;
+    final unviewedCount = UserSession().unviewedFriendRequestCount;
 
     return Scaffold(
       appBar: AppBar(
@@ -82,13 +106,32 @@ class _ContactsPageState extends State<ContactsPage> {
                     child: Icon(Icons.person_add, color: Colors.orange.shade700),
                   ),
                   title: const Text('新的朋友'),
-                  trailing: const Icon(Icons.chevron_right),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (unviewedCount > 0)
+                        CircleAvatar(
+                          radius: 10,
+                          backgroundColor: Colors.red,
+                          child: Text(
+                            '$unviewedCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const FriendRequestsPage(),
-                      ),
-                    );
+                    Navigator.of(context)
+                        .push(
+                          MaterialPageRoute(
+                            builder: (_) => const FriendRequestsPage(),
+                          ),
+                        )
+                        .then((_) => setState(() {}));
                   },
                 ),
                 const Divider(height: 1, indent: 72),

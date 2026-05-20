@@ -77,6 +77,7 @@ class _LoginPageState extends State<LoginPage> {
       tcpClient.onError(_onTcpError);
 
       session.tcpClient = tcpClient;
+      session.setupGlobalHandlers();
       await tcpClient.connect(session.tcpHost, session.tcpPort);
     } catch (e) {
       if (!mounted) return;
@@ -90,6 +91,18 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       final error = ErrorCode.fromValue(data['error'] as int? ?? -1);
       if (error == ErrorCode.ok) {
+        final applyList = data['apply_list'];
+        if (applyList is List) {
+          for (final item in applyList) {
+            if (item is Map<String, dynamic>) {
+              UserSession().friendRequests.add({
+                'applyName': item['name']?.toString() ?? '',
+                'applyEmail': item['email']?.toString() ?? '',
+                'fromUid': item['uid'] as int? ?? 0,
+              });
+            }
+          }
+        }
         setState(() => _loading = false);
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),

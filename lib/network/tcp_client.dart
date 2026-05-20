@@ -102,6 +102,7 @@ class TcpClient {
       try {
         final bodyStr = utf8.decode(bodyBytes);
         final data = jsonDecode(bodyStr) as Map<String, dynamic>;
+        print('[TCP] 收到消息 msgId=$msgId data=$data');
         for (final handler in _messageHandlers) {
           handler(msgId, data);
         }

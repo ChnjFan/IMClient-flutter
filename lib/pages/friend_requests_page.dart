@@ -12,11 +12,16 @@ class FriendRequestsPage extends StatefulWidget {
 
 class _FriendRequestsPageState extends State<FriendRequestsPage> {
   final _msgHandler = TcpMessageHandler();
-  final List<Map<String, dynamic>> _requests = [];
+  final Set<int> _acceptedFromUids = {};
+  int? _acceptingFromUid;
+
+  List<Map<String, dynamic>> get _requests => UserSession().friendRequests;
 
   @override
   void initState() {
     super.initState();
+    UserSession().viewedFriendRequestCount =
+        UserSession().friendRequests.length;
     _setupMessageHandlers();
     UserSession().tcpClient?.onMessage(_onTcpMessage);
   }
@@ -28,9 +33,33 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
   }
 
   void _setupMessageHandlers() {
-    _msgHandler.on(TcpMsgId.notifyFriendAddReq, (msgId, data) {
+    _msgHandler.on(TcpMsgId.notifyFriendReq, (msgId, data) {
       if (!mounted) return;
-      setState(() => _requests.add(data));
+      UserSession().viewedFriendRequestCount =
+          UserSession().friendRequests.length;
+      setState(() {});
+    });
+
+    _msgHandler.on(TcpMsgId.friendAuthRsp, (msgId, data) {
+      if (!mounted) return;
+      final error = data['error'] as int? ?? -1;
+      if (error == 0 && _acceptingFromUid != null) {
+        _acceptedFromUids.add(_acceptingFromUid!);
+      }
+      setState(() => _acceptingFromUid = null);
+    });
+  }
+
+  void _acceptFriend(Map<String, dynamic> req) {
+    final tcpClient = UserSession().tcpClient;
+    if (tcpClient == null || !tcpClient.isConnected) return;
+
+    final fromUid = req['fromUid'] as int? ?? -1;
+    setState(() => _acceptingFromUid = fromUid);
+
+    tcpClient.sendMessage(TcpMsgId.friendAuthReq.value, {
+      'uid': UserSession().uid,
+      'fromUid': fromUid,
     });
   }
 
@@ -45,25 +74,43 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
       body:
           _requests.isEmpty
               ? const Center(
-                child: Text(
-                  '暂无好友申请',
-                  style: TextStyle(color: Colors.grey),
-                ),
+                child: Text('暂无好友申请', style: TextStyle(color: Colors.grey)),
               )
               : ListView.separated(
                 itemCount: _requests.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+                separatorBuilder:
+                    (_, __) => const Divider(height: 1, indent: 72),
                 itemBuilder: (context, index) {
                   final req = _requests[index];
-                  final name = req['name']?.toString() ?? '';
-                  final email = req['email']?.toString() ?? '';
-                  final reason = req['reason']?.toString() ?? '';
+                  final applyName = req['applyName']?.toString() ?? '';
+                  final applyEmail = req['applyEmail']?.toString() ?? '';
+                  final fromUid = req['fromUid'] as int? ?? -1;
+                  final accepted = _acceptedFromUids.contains(fromUid);
+                  final accepting = _acceptingFromUid == fromUid;
                   return ListTile(
                     leading: CircleAvatar(
-                      child: Text(name.isNotEmpty ? name[0] : '?'),
+                      child: Text(applyName.isNotEmpty ? applyName[0] : '?'),
                     ),
-                    title: Text(name.isNotEmpty ? name : '未知用户'),
-                    subtitle: Text(reason.isNotEmpty ? reason : email),
+                    title: Text(applyName.isNotEmpty ? applyName : '未知用户'),
+                    subtitle: Text(applyEmail),
+                    trailing: FilledButton.tonal(
+                      onPressed:
+                          (accepted || accepting)
+                              ? null
+                              : () => _acceptFriend(req),
+                      child:
+                          accepted
+                              ? const Text('已添加')
+                              : accepting
+                              ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text('添加'),
+                    ),
                   );
                 },
               ),
