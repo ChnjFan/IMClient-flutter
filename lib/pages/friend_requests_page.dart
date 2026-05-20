@@ -45,6 +45,13 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
       final error = data['error'] as int? ?? -1;
       if (error == 0 && _acceptingFromUid != null) {
         _acceptedFromUids.add(_acceptingFromUid!);
+        for (final req in UserSession().friendRequests) {
+          final uid = req['fromUid'] as int?;
+          if (uid == _acceptingFromUid) {
+            req['status'] = 1;
+            break;
+          }
+        }
       }
       setState(() => _acceptingFromUid = null);
     });
@@ -58,8 +65,8 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
     setState(() => _acceptingFromUid = fromUid);
 
     tcpClient.sendMessage(TcpMsgId.friendAuthReq.value, {
-      'uid': UserSession().uid,
-      'fromUid': fromUid,
+      'auth_uid': UserSession().uid,
+      'apply_uid': fromUid,
     });
   }
 
@@ -85,32 +92,57 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
                   final applyName = req['applyName']?.toString() ?? '';
                   final applyEmail = req['applyEmail']?.toString() ?? '';
                   final fromUid = req['fromUid'] as int? ?? -1;
+                  final status = req['status'] as int? ?? 0;
                   final accepted = _acceptedFromUids.contains(fromUid);
                   final accepting = _acceptingFromUid == fromUid;
+
+                  String statusText(int s) {
+                    switch (s) {
+                      case 1:
+                        return '已同意';
+                      case 2:
+                        return '已拒绝';
+                      case 3:
+                        return '已过期';
+                      default:
+                        return '';
+                    }
+                  }
+
+                  final showButton = status == 0 && !accepted;
+                  final statusLabel = accepted ? '已添加' : statusText(status);
+
                   return ListTile(
                     leading: CircleAvatar(
                       child: Text(applyName.isNotEmpty ? applyName[0] : '?'),
                     ),
                     title: Text(applyName.isNotEmpty ? applyName : '未知用户'),
                     subtitle: Text(applyEmail),
-                    trailing: FilledButton.tonal(
-                      onPressed:
-                          (accepted || accepting)
-                              ? null
-                              : () => _acceptFriend(req),
-                      child:
-                          accepted
-                              ? const Text('已添加')
-                              : accepting
-                              ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : const Text('添加'),
-                    ),
+                    trailing:
+                        showButton
+                            ? FilledButton.tonal(
+                              onPressed:
+                                  accepting ? null : () => _acceptFriend(req),
+                              child:
+                                  accepting
+                                      ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                      : const Text('添加'),
+                            )
+                            : statusLabel.isNotEmpty
+                            ? Text(
+                              statusLabel,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                              ),
+                            )
+                            : null,
                   );
                 },
               ),
