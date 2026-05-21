@@ -1,6 +1,7 @@
 import 'package:im_client/network/tcp_msg_id.dart';
 
-typedef TcpMsgCallback = void Function(TcpMsgId msgId, Map<String, dynamic> data);
+typedef TcpMsgCallback =
+    void Function(TcpMsgId msgId, Map<String, dynamic> data);
 
 class TcpMessageHandler {
   final Map<TcpMsgId, List<TcpMsgCallback>> _handlers = {};

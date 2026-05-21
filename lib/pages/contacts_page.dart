@@ -4,6 +4,7 @@ import 'package:im_client/network/tcp_msg_id.dart';
 import 'package:im_client/session/user_session.dart';
 import 'add_friend_page.dart';
 import 'friend_requests_page.dart';
+import 'user_profile_page.dart';
 
 class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
@@ -17,11 +18,15 @@ class _ContactsPageState extends State<ContactsPage> {
   final _msgHandler = TcpMessageHandler();
   String _keyword = '';
 
-  final _allContacts = const ['张三', '李四', '王五', '赵六', '小明', '小红'];
+  List<Map<String, dynamic>> get _allContacts => UserSession().friends;
 
-  List<String> get _filteredContacts {
+  List<Map<String, dynamic>> get _filteredContacts {
     if (_keyword.isEmpty) return _allContacts;
-    return _allContacts.where((name) => name.contains(_keyword)).toList();
+    return _allContacts
+        .where(
+          (f) => (f['name']?.toString() ?? '').contains(_keyword),
+        )
+        .toList();
   }
 
   @override
@@ -40,6 +45,10 @@ class _ContactsPageState extends State<ContactsPage> {
 
   void _setupMessageHandlers() {
     _msgHandler.on(TcpMsgId.notifyFriendReq, (msgId, data) {
+      if (!mounted) return;
+      setState(() {});
+    });
+    _msgHandler.on(TcpMsgId.notifyFriendAuth, (msgId, data) {
       if (!mounted) return;
       setState(() {});
     });
@@ -148,9 +157,20 @@ class _ContactsPageState extends State<ContactsPage> {
                 else
                   for (int i = 0; i < contacts.length; i++) ...[
                     ListTile(
-                      leading: CircleAvatar(child: Text(contacts[i][0])),
-                      title: Text(contacts[i]),
-                      onTap: () {},
+                      leading: CircleAvatar(
+                        child: Text(
+                          (contacts[i]['name']?.toString() ?? '?')[0],
+                        ),
+                      ),
+                      title: Text(contacts[i]['name']?.toString() ?? ''),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                UserProfilePage(user: contacts[i]),
+                          ),
+                        );
+                      },
                     ),
                     if (i < contacts.length - 1)
                       const Divider(height: 1, indent: 72),

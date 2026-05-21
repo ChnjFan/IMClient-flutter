@@ -7,7 +7,10 @@ enum TcpMsgId {
   friendAddRsp(1010), // 添加好友响应
   notifyFriendReq(1011), // 通知好友添加请求
   friendAuthReq(1012), // 好友认证请求
-  friendAuthRsp(1013); // 好友认证响应
+  friendAuthRsp(1013), // 好友认证响应
+  notifyFriendAuth(1014), // 通知好友认证结果
+  notifyChatMsgReq(1015), // 聊天消息请求
+  notifyChatMsgRsp(1016); // 聊天消息响应
 
   const TcpMsgId(this.value);
 

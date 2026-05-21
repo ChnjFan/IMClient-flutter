@@ -104,7 +104,9 @@ class TcpClient {
         final data = jsonDecode(bodyStr) as Map<String, dynamic>;
         print('[TCP] 收到消息 msgId=$msgId data=$data');
         for (final handler in _messageHandlers) {
-          handler(msgId, data);
+          try {
+            handler(msgId, data);
+          } catch (_) {}
         }
       } catch (e) {
         for (final handler in _errorHandlers) {

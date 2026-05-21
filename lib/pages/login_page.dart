@@ -4,7 +4,6 @@ import 'package:im_client/network/http_client.dart';
 import 'package:im_client/network/tcp_client.dart';
 import 'package:im_client/network/tcp_message_handler.dart';
 import 'package:im_client/network/tcp_msg_id.dart';
-import 'package:im_client/services/notification_service.dart';
 import 'package:im_client/session/user_session.dart';
 import 'package:im_client/utils/crypto_util.dart';
 import 'register_page.dart';
@@ -27,6 +26,11 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    final client = UserSession().tcpClient;
+    client?.removeMessageHandler(_onTcpMessage);
+    client?.removeConnectedHandler(_onTcpConnected);
+    client?.removeDisconnectedHandler(_onTcpDisconnected);
+    client?.removeErrorHandler(_onTcpError);
     _accountController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -92,30 +96,8 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       final error = ErrorCode.fromValue(data['error'] as int? ?? -1);
       if (error == ErrorCode.ok) {
-        final applyList = data['apply_list'];
-        if (applyList is List) {
-          var pendingCount = 0;
-          for (final item in applyList) {
-            if (item is Map<String, dynamic>) {
-              final status = item['status'] as int? ?? 0;
-              UserSession().friendRequests.add({
-                'applyName': item['name']?.toString() ?? '',
-                'applyEmail': item['email']?.toString() ?? '',
-                'fromUid': item['uid'] as int? ?? 0,
-                'status': status,
-              });
-              if (status == 0) {
-                pendingCount++;
-              }
-            }
-          }
-          if (pendingCount > 0) {
-            NotificationService().show(
-              title: '好友申请',
-              body: '您有 $pendingCount 条新的好友申请',
-            );
-          }
-        }
+        UserSession().processAuthApplyList(data['apply_list']);
+        UserSession().processAuthFriendList(data['friend_list']);
         setState(() => _loading = false);
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),

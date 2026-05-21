@@ -20,8 +20,6 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
   @override
   void initState() {
     super.initState();
-    UserSession().viewedFriendRequestCount =
-        UserSession().friendRequests.length;
     _setupMessageHandlers();
     UserSession().tcpClient?.onMessage(_onTcpMessage);
   }
@@ -35,8 +33,6 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
   void _setupMessageHandlers() {
     _msgHandler.on(TcpMsgId.notifyFriendReq, (msgId, data) {
       if (!mounted) return;
-      UserSession().viewedFriendRequestCount =
-          UserSession().friendRequests.length;
       setState(() {});
     });
 
