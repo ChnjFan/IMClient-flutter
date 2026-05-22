@@ -48,7 +48,7 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       final error = data['error'] as int? ?? -1;
       final localId = data['msg_id'] as int?;
-      if (localId != null && _pendingMsgIds.contains(localId)) {
+      if (localId != null) {
         _pendingMsgIds.remove(localId);
         _timers.remove(localId)?.cancel();
         for (final m in _messages) {
@@ -92,7 +92,7 @@ class _ChatPageState extends State<ChatPage> {
     tcpClient.sendMessage(TcpMsgId.notifyChatMsgReq.value, {
       'from_uid': UserSession().uid,
       'to_uid': toUid,
-      'msg_type': 0,
+      'msg_type': 1,
       'content': text,
       'msg_id': localId,
     });
@@ -185,21 +185,15 @@ class _ChatPageState extends State<ChatPage> {
 
                 Widget statusWidget = const SizedBox.shrink();
                 if (isMe && status == 'sending') {
-                  statusWidget = const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                  statusWidget = const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   );
                 } else if (isMe && status == 'failed') {
                   statusWidget = GestureDetector(
                     onTap: () => _retrySend(index),
-                    child: const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: Icon(Icons.error, size: 18, color: Colors.red),
-                    ),
+                    child: const Icon(Icons.error, size: 18, color: Colors.red),
                   );
                 }
 
@@ -217,13 +211,11 @@ class _ChatPageState extends State<ChatPage> {
                         maxWidth: MediaQuery.of(context).size.width * 0.6,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            isMe ? const Color(0xFF95EC69) : Colors.white,
+                        color: isMe ? const Color(0xFF95EC69) : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(msg['text']?.toString() ?? ''),
                     ),
-                    statusWidget,
                   ],
                 );
 
@@ -236,6 +228,11 @@ class _ChatPageState extends State<ChatPage> {
                     children:
                         isMe
                             ? [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: statusWidget,
+                              ),
+                              const SizedBox(width: 4),
                               Flexible(child: bubble),
                               const SizedBox(width: 8),
                               avatar,
@@ -260,8 +257,7 @@ class _ChatPageState extends State<ChatPage> {
                     _isVoiceMode ? Icons.keyboard_outlined : Icons.mic_none,
                   ),
                   iconSize: 30,
-                  onPressed: () =>
-                      setState(() => _isVoiceMode = !_isVoiceMode),
+                  onPressed: () => setState(() => _isVoiceMode = !_isVoiceMode),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
                     minWidth: 40,
