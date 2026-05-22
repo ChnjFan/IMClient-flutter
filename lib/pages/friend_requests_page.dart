@@ -48,6 +48,10 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
             break;
           }
         }
+        final friend = data['friend'];
+        if (friend is Map<String, dynamic>) {
+          UserSession().addFriend(friend);
+        }
       }
       setState(() => _acceptingFromUid = null);
     });

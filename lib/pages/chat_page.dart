@@ -67,7 +67,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _sendMessage() {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || text.length > 1024) return;
 
     final tcpClient = UserSession().tcpClient;
     if (tcpClient == null || !tcpClient.isConnected) return;
