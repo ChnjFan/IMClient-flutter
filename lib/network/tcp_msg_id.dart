@@ -9,8 +9,11 @@ enum TcpMsgId {
   friendAuthReq(1012), // 好友认证请求
   friendAuthRsp(1013), // 好友认证响应
   notifyFriendAuth(1014), // 通知好友认证结果
-  notifyChatMsgReq(1015), // 聊天消息请求
-  notifyChatMsgRsp(1016); // 聊天消息响应
+  chatMsgReq(1015), // 聊天消息请求
+  chatMsgRsp(1016), // 聊天消息响应
+  notifyChatMsg(1017), // 聊天消息推送
+  conversationReq(1018), // 会话请求
+  conversationRsp(1019); // 会话响应
 
   const TcpMsgId(this.value);
 

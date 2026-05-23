@@ -44,7 +44,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _setupMessageHandlers() {
-    _msgHandler.on(TcpMsgId.notifyChatMsgRsp, (msgId, data) {
+    _msgHandler.on(TcpMsgId.chatMsgRsp, (msgId, data) {
       if (!mounted) return;
       final error = data['error'] as int? ?? -1;
       final localId = data['msg_id'] as int?;
@@ -57,6 +57,16 @@ class _ChatPageState extends State<ChatPage> {
             break;
           }
         }
+      }
+    });
+
+    _msgHandler.on(TcpMsgId.notifyChatMsg, (msgId, data) {
+      if (!mounted) return;
+      final fromUid = data['from_uid'] as int? ?? 0;
+      final convUid = widget.conversation['uid'] as int? ?? 0;
+      if (fromUid == convUid) {
+        setState(() {});
+        _scrollToBottom();
       }
     });
   }
@@ -89,7 +99,7 @@ class _ChatPageState extends State<ChatPage> {
     _startTimeout(localId);
     _scrollToBottom();
 
-    tcpClient.sendMessage(TcpMsgId.notifyChatMsgReq.value, {
+    tcpClient.sendMessage(TcpMsgId.chatMsgReq.value, {
       'from_uid': UserSession().uid,
       'to_uid': toUid,
       'msg_type': 1,
@@ -111,7 +121,7 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _messages[index]['status'] = 'sending');
     _startTimeout(localId);
 
-    tcpClient.sendMessage(TcpMsgId.notifyChatMsgReq.value, {
+    tcpClient.sendMessage(TcpMsgId.chatMsgReq.value, {
       'from_uid': UserSession().uid,
       'to_uid': toUid,
       'msg_type': 0,

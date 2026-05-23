@@ -119,6 +119,29 @@ class UserSession {
         addFriend(friend);
       }
     });
+
+    _globalMsgHandler.on(TcpMsgId.notifyChatMsg, (msgId, data) {
+      final fromUid = data['from_uid'] as int? ?? 0;
+      final content = data['content']?.toString() ?? '';
+      if (fromUid == 0 || content.isEmpty) return;
+
+      Map<String, dynamic> sender = {'uid': fromUid};
+      for (final f in friends) {
+        if (f['uid'] == fromUid) {
+          sender = f;
+          break;
+        }
+      }
+
+      final conv = addOrGetConversation(sender);
+      final messages = conv['messages'] as List<Map<String, dynamic>>;
+      messages.add({
+        'text': content,
+        'time': DateTime.now().toString(),
+        'isMe': false,
+        'status': 'sent',
+      });
+    });
   }
 
   void _onGlobalTcpMessage(int msgId, Map<String, dynamic> data) {
