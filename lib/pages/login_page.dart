@@ -98,6 +98,7 @@ class _LoginPageState extends State<LoginPage> {
       if (error == ErrorCode.ok) {
         UserSession().processAuthApplyList(data['apply_list']);
         UserSession().processAuthFriendList(data['friend_list']);
+        UserSession().processAuthConversationList(data['conv_list']);
         setState(() => _loading = false);
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),

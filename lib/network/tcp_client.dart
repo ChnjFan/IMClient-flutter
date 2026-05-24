@@ -143,6 +143,7 @@ class TcpClient {
 
   void sendMessage(int msgId, Map<String, dynamic> data) {
     if (_socket == null) return;
+    print('[TCP] 发送消息 msgId=$msgId data=$data');
 
     final bodyStr = jsonEncode(data);
     final bodyBytes = utf8.encode(bodyStr);

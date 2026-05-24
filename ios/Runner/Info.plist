@@ -68,3 +68,17 @@
 	</array>
 </dict>
 </plist>
+<key>NSLocalNetworkUsageDescription</key>
+<string>需要访问局域网连接服务器</string>
+<key>NSBonjourServices</key>
+<array>
+  <string>_tcp</string>
+  <string>_udp</string>
+</array>
+<key>NSAppTransportSecurity</key>
+<dict>
+  <key>NSAllowsLocalNetworking</key>
+  <true/>
+  <key>NSAllowsArbitraryLoads</key>
+  <true/>
+</dict>

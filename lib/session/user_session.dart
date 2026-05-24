@@ -60,11 +60,21 @@ class UserSession {
     for (final c in conversations) {
       if (c['uid'] == fUid) return c;
     }
+    final minUid = uid < fUid ? uid : fUid;
+    final maxUid = uid > fUid ? uid : fUid;
     final conv = <String, dynamic>{
       'uid': fUid,
       'name': user['name']?.toString() ?? '',
       'email': user['email']?.toString() ?? '',
       'messages': <Map<String, dynamic>>[],
+      'convId': 'c2c_${minUid}_$maxUid',
+      'convType': 1,
+      'unreadCount': 0,
+      'lastMsgId': 0,
+      'lastTime': '',
+      'isTop': false,
+      'isMute': false,
+      'needsConvReq': true,
     };
     conversations.insert(0, conv);
     return conv;
@@ -77,6 +87,65 @@ class UserSession {
         addFriend(item);
       }
     }
+  }
+
+  void processAuthConversationList(dynamic convList) {
+    if (convList is! List) return;
+    for (final item in convList) {
+      if (item is! Map<String, dynamic>) continue;
+      final convId = item['conv_id']?.toString() ?? '';
+      if (convId.isEmpty) continue;
+      if (conversations.any((c) => c['convId'] == convId)) continue;
+
+      // conv_id format: c2c_<uid1>_<uid2>, parse out peer uid
+      final parts = convId.split('_');
+      final parsedPeerUid = parts.length == 3
+          ? (int.tryParse(parts[1]) == uid ? int.tryParse(parts[2]) : int.tryParse(parts[1]))
+          : null;
+      final toUid = parsedPeerUid ?? item['to_uid'] as int? ?? 0;
+
+      Map<String, dynamic> friend = {};
+      for (final f in friends) {
+        if (f['uid'] == toUid) {
+          friend = f;
+          break;
+        }
+      }
+
+      final lastMsg = item['last_msg']?.toString() ?? '';
+      final messages = <Map<String, dynamic>>[];
+      if (lastMsg.isNotEmpty) {
+        messages.add({
+          'text': lastMsg,
+          'time': item['last_time']?.toString() ?? '',
+          'isMe': false,
+          'status': 'sent',
+        });
+      }
+
+      conversations.add({
+        'uid': toUid,
+        'convId': convId,
+        'convType': item['conv_type'] as int? ?? 0,
+        'name': friend['name']?.toString() ?? '',
+        'email': friend['email']?.toString() ?? '',
+        'messages': messages,
+        'unreadCount': item['unread_count'] as int? ?? 0,
+        'lastMsgId': item['last_msg_id'] as int? ?? 0,
+        'lastTime': item['last_time']?.toString() ?? '',
+        'isTop': (item['is_top'] as int? ?? 0) == 1,
+        'isMute': (item['is_mute'] as int? ?? 0) == 1,
+        'needsConvReq': true,
+      });
+    }
+    conversations.sort((a, b) {
+      final aTop = (a['isTop'] == true) ? 1 : 0;
+      final bTop = (b['isTop'] == true) ? 1 : 0;
+      if (aTop != bTop) return bTop - aTop;
+      final aTime = a['lastTime']?.toString() ?? '';
+      final bTime = b['lastTime']?.toString() ?? '';
+      return bTime.compareTo(aTime);
+    });
   }
 
   int get unviewedFriendRequestCount =>
@@ -104,6 +173,7 @@ class UserSession {
       if (error != 0) return;
       processAuthApplyList(data['apply_list']);
       processAuthFriendList(data['friend_list']);
+      processAuthConversationList(data['conv_list']);
     });
 
     _globalMsgHandler.on(TcpMsgId.notifyFriendReq, (msgId, data) {
@@ -135,12 +205,15 @@ class UserSession {
 
       final conv = addOrGetConversation(sender);
       final messages = conv['messages'] as List<Map<String, dynamic>>;
+      final now = DateTime.now().toString();
       messages.add({
         'text': content,
-        'time': DateTime.now().toString(),
+        'time': now,
         'isMe': false,
         'status': 'sent',
       });
+      conv['lastTime'] = now;
+      conv['unreadCount'] = (conv['unreadCount'] as int? ?? 0) + 1;
     });
   }
 

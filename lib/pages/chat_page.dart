@@ -21,6 +21,8 @@ class _ChatPageState extends State<ChatPage> {
   int _msgIdCounter = 0;
   final Set<int> _pendingMsgIds = {};
   final Map<int, Timer> _timers = {};
+  bool _convReqSuccess = false;
+  Timer? _convReqTimer;
 
   List<Map<String, dynamic>> get _messages =>
       widget.conversation['messages'] as List<Map<String, dynamic>>;
@@ -30,6 +32,31 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _setupMessageHandlers();
     UserSession().tcpClient?.onMessage(_onTcpMessage);
+    _sendConversationReqIfNeeded();
+  }
+
+  void _sendConversationReqIfNeeded() {
+    if (widget.conversation['needsConvReq'] == true) {
+      widget.conversation['needsConvReq'] = false;
+      _sendConversationReq();
+    } else {
+      _convReqSuccess = true;
+    }
+  }
+
+  void _sendConversationReq() {
+    final tcpClient = UserSession().tcpClient;
+    if (tcpClient == null || !tcpClient.isConnected) return;
+    tcpClient.sendMessage(TcpMsgId.conversationReq.value, {
+      'uid': UserSession().uid,
+      'conv_id': widget.conversation['convId']?.toString() ?? '',
+      'conv_type': 1,
+      'to_uid': widget.conversation['uid'] as int? ?? 0,
+    });
+    _convReqTimer?.cancel();
+    _convReqTimer = Timer(const Duration(seconds: 5), () {
+      _convReqSuccess = false;
+    });
   }
 
   @override
@@ -37,6 +64,7 @@ class _ChatPageState extends State<ChatPage> {
     for (final timer in _timers.values) {
       timer.cancel();
     }
+    _convReqTimer?.cancel();
     UserSession().tcpClient?.removeMessageHandler(_onTcpMessage);
     _textController.dispose();
     _scrollController.dispose();
@@ -58,6 +86,13 @@ class _ChatPageState extends State<ChatPage> {
           }
         }
       }
+    });
+
+    _msgHandler.on(TcpMsgId.conversationRsp, (msgId, data) {
+      if (!mounted) return;
+      _convReqTimer?.cancel();
+      final error = data['error'] as int? ?? -1;
+      _convReqSuccess = error == 0;
     });
 
     _msgHandler.on(TcpMsgId.notifyChatMsg, (msgId, data) {
@@ -82,6 +117,11 @@ class _ChatPageState extends State<ChatPage> {
     final tcpClient = UserSession().tcpClient;
     if (tcpClient == null || !tcpClient.isConnected) return;
 
+    if (!_convReqSuccess) {
+      _sendConversationReq();
+      return;
+    }
+
     final localId = ++_msgIdCounter;
     final toUid = widget.conversation['uid'] as int? ?? 0;
 
@@ -102,6 +142,7 @@ class _ChatPageState extends State<ChatPage> {
     tcpClient.sendMessage(TcpMsgId.chatMsgReq.value, {
       'from_uid': UserSession().uid,
       'to_uid': toUid,
+      'conv_id': widget.conversation['convId']?.toString() ?? '',
       'msg_type': 1,
       'content': text,
       'msg_id': localId,
@@ -124,6 +165,7 @@ class _ChatPageState extends State<ChatPage> {
     tcpClient.sendMessage(TcpMsgId.chatMsgReq.value, {
       'from_uid': UserSession().uid,
       'to_uid': toUid,
+      'conv_id': widget.conversation['convId']?.toString() ?? '',
       'msg_type': 0,
       'content': text,
       'msg_id': localId,
@@ -161,11 +203,11 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final name = widget.conversation['name']?.toString() ?? '';
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final myName = UserSession().nickname;
     final peerName = widget.conversation['name']?.toString() ?? '';
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(title: Text(name.isNotEmpty ? name : '聊天')),
       body: Column(
         children: [
@@ -259,7 +301,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
           const Divider(height: 1),
           Padding(
-            padding: EdgeInsets.fromLTRB(10, 10, 10, 50 + bottomInset),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
             child: Row(
               children: [
                 IconButton(
