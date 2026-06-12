@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:im_client/session/user_session.dart';
 import 'conversations_page.dart';
 import 'contacts_page.dart';
 import 'profile_page.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,6 +20,21 @@ class _HomePageState extends State<HomePage> {
     ContactsPage(),
     ProfilePage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    UserSession().onForceLogout = () {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('您已被强制下线')),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
