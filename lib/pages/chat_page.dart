@@ -1,5 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:im_client/network/tcp_message_handler.dart';
 import 'package:im_client/network/tcp_msg_id.dart';
 import 'package:im_client/session/user_session.dart';
@@ -81,7 +86,12 @@ class _ChatPageState extends State<ChatPage> {
         _timers.remove(localId)?.cancel();
         for (final m in _messages) {
           if (m['localId'] == localId) {
-            setState(() => m['status'] = error == 0 ? 'sent' : 'failed');
+            if (m['type'] == 'file' && error == 0) {
+              setState(() => m['status'] = 'uploading');
+              _startFileUpload(m, localId);
+            } else {
+              setState(() => m['status'] = error == 0 ? 'sent' : 'failed');
+            }
             break;
           }
         }
@@ -188,6 +198,185 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  void _showAttachmentSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file_outlined),
+                title: const Text('文件'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndSendFile();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndSendFile() async {
+    final result = await FilePicker.platform.pickFiles();
+    if (result == null || result.files.isEmpty) return;
+
+    final file = result.files.first;
+    final filePath = file.path;
+    if (filePath == null) return;
+
+    final tcpClient = UserSession().tcpClient;
+    if (tcpClient == null || !tcpClient.isConnected) return;
+
+    if (!_convReqSuccess) {
+      _sendConversationReq();
+      return;
+    }
+
+    final localId = ++_msgIdCounter;
+    final toUid = widget.conversation['uid'] as int? ?? 0;
+
+    setState(() {
+      _messages.add({
+        'type': 'file',
+        'fileName': file.name,
+        'filePath': filePath,
+        'fileSize': file.size,
+        'time': DateTime.now().toString(),
+        'isMe': true,
+        'localId': localId,
+        'status': 'sending',
+        'uploadSeq': 0,
+      });
+    });
+    _startTimeout(localId);
+    _scrollToBottom();
+
+    final content = jsonEncode({'filename': file.name, 'size': file.size});
+    tcpClient.sendMessage(TcpMsgId.chatMsgReq.value, {
+      'from_uid': UserSession().uid,
+      'to_uid': toUid,
+      'conv_id': widget.conversation['convId']?.toString() ?? '',
+      'msg_type': 2,
+      'content': content,
+      'msg_id': localId,
+    });
+  }
+
+  static const int _chunkSize = 1024;
+
+  Future<void> _startFileUpload(Map<String, dynamic> msg, int localId) async {
+    final filePath = msg['filePath']?.toString();
+    if (filePath == null) return;
+
+    final tcpClient = UserSession().tcpClient;
+    if (tcpClient == null || !tcpClient.isConnected) return;
+
+    final fileBytes = await File(filePath).readAsBytes();
+    final md5Hash = md5.convert(fileBytes).toString();
+    final totalSize = fileBytes.length;
+    final convId = widget.conversation['convId']?.toString() ?? '';
+    final storePath = convId;
+    final fileName = msg['fileName']?.toString() ?? '';
+
+    int seq = 0;
+    int offset = 0;
+    while (offset < totalSize) {
+      seq++;
+      final end =
+          (offset + _chunkSize > totalSize) ? totalSize : offset + _chunkSize;
+      final chunk = Uint8List.sublistView(fileBytes, offset, end);
+      final last = end >= totalSize ? 1 : 0;
+
+      tcpClient.sendMessage(TcpMsgId.fileUploadReq.value, {
+        'conv_id': storePath,
+        'name': fileName,
+        'md5': md5Hash,
+        'seq': seq,
+        'trans_size': chunk.length,
+        'total_size': totalSize,
+        'data': base64Encode(chunk),
+        'last': last,
+        'msg_id': localId,
+      });
+
+      setState(() => msg['uploadSeq'] = seq);
+
+      if (last == 1) {
+        if (mounted) setState(() => msg['status'] = 'sent');
+        break;
+      }
+
+      final completer = Completer<void>();
+      void handler(TcpMsgId rspMsgId, Map<String, dynamic> rspData) {
+        final rspSeq = rspData['seq'] as int?;
+        if (rspSeq == seq + 1) {
+          _msgHandler.remove(TcpMsgId.fileUploadRsp, handler);
+          completer.complete();
+        }
+      }
+
+      _msgHandler.on(TcpMsgId.fileUploadRsp, handler);
+
+      try {
+        await completer.future.timeout(const Duration(seconds: 30));
+        offset = end;
+      } catch (_) {
+        _msgHandler.remove(TcpMsgId.fileUploadRsp, handler);
+        if (mounted) {
+          setState(() => msg['status'] = 'failed');
+        }
+        return;
+      }
+    }
+  }
+
+  Widget _buildBubbleContent(Map<String, dynamic> msg) {
+    if (msg['type'] == 'file') {
+      final fileName = msg['fileName']?.toString() ?? '未知文件';
+      final fileSize = msg['fileSize'] as int?;
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.insert_drive_file, size: 32),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  fileName,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  style: const TextStyle(fontSize: 14),
+                ),
+                if (fileSize != null)
+                  Text(
+                    _formatFileSize(fileSize),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    return Text(msg['text']?.toString() ?? '');
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -236,7 +425,7 @@ class _ChatPageState extends State<ChatPage> {
                 );
 
                 Widget statusWidget = const SizedBox.shrink();
-                if (isMe && status == 'sending') {
+                if (isMe && (status == 'sending' || status == 'uploading')) {
                   statusWidget = const SizedBox(
                     width: 14,
                     height: 14,
@@ -266,7 +455,7 @@ class _ChatPageState extends State<ChatPage> {
                         color: isMe ? const Color(0xFF95EC69) : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(msg['text']?.toString() ?? ''),
+                      child: _buildBubbleContent(msg),
                     ),
                   ],
                 );
@@ -358,7 +547,7 @@ class _ChatPageState extends State<ChatPage> {
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline),
                   iconSize: 30,
-                  onPressed: () {},
+                  onPressed: _showAttachmentSheet,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
                     minWidth: 40,

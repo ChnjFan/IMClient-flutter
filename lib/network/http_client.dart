@@ -1,6 +1,9 @@
+import 'dart:io' as io;
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:im_client/config/app_config.dart';
+import 'package:im_client/network/ssl_config.dart';
 
 class HttpClient {
   static HttpClient? _instance;
@@ -20,6 +23,14 @@ class HttpClient {
     _dio.interceptors.add(
       LogInterceptor(requestBody: true, responseBody: true),
     );
+
+    if (kReleaseMode) {
+      (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+        final client = io.HttpClient();
+        client.badCertificateCallback = (cert, host, port) => SslConfig.verifyCertificate(cert);
+        return client;
+      };
+    }
   }
 
   factory HttpClient() {

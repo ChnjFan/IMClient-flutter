@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:im_client/config/app_config.dart';
+import 'package:im_client/network/ssl_config.dart';
 
 typedef MessageHandler = void Function(int msgId, Map<String, dynamic> data);
 typedef ErrorHandler = void Function(dynamic error);
@@ -52,11 +54,20 @@ class TcpClient {
     if (_host == null || _port == null) return;
 
     try {
-      _socket = await Socket.connect(
-        _host!,
-        _port!,
-        timeout: const Duration(seconds: 10),
-      );
+      if (kReleaseMode) {
+        _socket = await SecureSocket.connect(
+          _host!,
+          _port!,
+          timeout: const Duration(seconds: 10),
+          onBadCertificate: SslConfig.verifyCertificate,
+        );
+      } else {
+        _socket = await Socket.connect(
+          _host!,
+          _port!,
+          timeout: const Duration(seconds: 10),
+        );
+      }
       _reconnecting = false;
       _reconnectCount = 0;
       _buffer.clear();

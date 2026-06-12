@@ -23,6 +23,8 @@ class UserSession {
   TcpMessageHandler _globalMsgHandler = TcpMessageHandler();
   bool _globalHandlerRegistered = false;
 
+  void Function()? onForceLogout;
+
   void _addOrUpdateFriendRequest(Map<String, dynamic> item) {
     final fromUid = item['fromUid'] as int? ?? 0;
     friendRequests.removeWhere((r) => r['fromUid'] == fromUid);
@@ -188,6 +190,11 @@ class UserSession {
       if (friend is Map<String, dynamic>) {
         addFriend(friend);
       }
+    });
+
+    _globalMsgHandler.on(TcpMsgId.notifyOffline, (msgId, data) {
+      clear();
+      onForceLogout?.call();
     });
 
     _globalMsgHandler.on(TcpMsgId.notifyChatMsg, (msgId, data) {
